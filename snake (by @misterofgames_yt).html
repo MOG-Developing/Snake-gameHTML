@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Snake Game with Shop and Multiplier">
+    <title>Snake Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #gameContainer {
+            display: flex;
+        }
+
+        #snakeGame {
+            position: relative;
+            width: 450px; /* Increased width */
+            height: 450px; /* Increased height */
+            border: 2px solid #333; 
+            background-color: #fff; 
+            overflow: hidden; /* Prevent overflow */
+        }
+
+        .grid-line {
+            position: absolute;
+            background-color: rgba(200, 200, 200, 0.5); /* Light gray color for grid lines */
+            width: 2px; /* Thicker lines */
+        }
+
+        .snake-segment {
+            position: absolute; 
+            font-size: 20px; /* Adjust size for emoji */
+            transition: all 0.1s ease; /* Smooth movement */
+        }
+
+        .apple {
+            position: absolute; 
+            font-size: 20px; /* Adjust size for emoji */
+            transition: all 0.1s ease; /* Smooth movement */
+            width: 30px; /* Increase width for hitbox */
+            height: 30px; /* Increase height for hitbox */
+        }
+
+        .obstacle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: brown; /* Obstacle color */
+        }
+
+        .score-box {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #333;
+            background-color: white;
+            border-radius: 5px;
+        }
+
+        .score {
+            font-size: 1.2em;
+        }
+
+        .points {
+            font-size: 1em;
+        }
+
+        .multiplier {
+          font-size :1em ;
+          margin-top :5px ;
+      }
+
+      button {
+          padding: 10px 20px;
+          font-size: 1em;
+          color: white;
+          background-color: #007BFF; /* Button color */
+          border: none;
+          border-radius: 5px; /* Rounded corners */
+          cursor: pointer; 
+          transition: background-color 0.3s ease, transform 0.2s ease; /* Smooth transition */
+      }
+
+      button:hover {
+          background-color: #0056b3; /* Darker shade on hover */
+      }
+      
+      #shop {
+          margin-left: 20px; /* Space between shop and game area */
+          padding: 15px;
+          border-radius: 5px;
+          background-color: white;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+
+      .skin {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 5px; /* Space between skins */
+      }
+
+      .buy-button {
+          background-color : #28a745 ; /* Green color for buy buttons */
+          color : white ; /* White text for visibility */
+          border-radius :5px ; /* Rounded corners for buttons */
+          padding-left :5px ;
+          padding-right :5px ;
+          padding-top :3px ;
+          padding-bottom :3px ;
+      }
+      
+      #themeContainer {
+          display:none; 
+          position:absolute ;
+          top :50% ;
+          left :50% ;
+          transform :translate(-50%,-50%) ;
+          padding :20px ;
+          background-color:white ;
+          border-radius :5px ;
+          box-shadow :0 2px 10px rgba(0,0,0,0.1) ;
+      }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+      <div id="shop">
+          <h3>Shop</h3>
+          <div id="skins"></div>
+      </div>
+
+      <div>
+          <div class="score-box">
+              <div class="score" id="score">Score: 0</div>
+              <div class="points" id="points">Points: 0</div>
+              <div class="multiplier" id="multiplier">Multiplier x1</div>
+              <button id="restart">Restart Game</button>
+              <button id="pause">Pause Game</button> <!-- Pause button -->
+          </div>
+
+          <div id="snakeGame"></div>
+
+           <!-- Theme selection button -->
+           <button id="themeButton">Choose Theme</button>
+           <div id="themeSelector">
+               <h4>Select Theme</h4>
+               <button onclick="changeTheme('white')">White</button>
+               <button onclick="changeTheme('black')">Black</button>
+               <button onclick="changeTheme('darkcyan')">Dark Cyan</button>
+               <button onclick="closeThemeSelector()">Close</button> <!-- Close button -->
+           </div>
+
+      </div>
+    </div>
+
+    <script>
+        const snakeGameElement = document.getElementById('snakeGame');
+        const scoreDisplay = document.getElementById('score');
+        const pointsDisplay = document.getElementById('points');
+        const multiplierDisplay = document.getElementById('multiplier');
+        const restartButton = document.getElementById('restart');
+        const pauseButton = document.getElementById('pause');
+        const themeButton = document.getElementById('themeButton');
+        const themeSelector = document.getElementById('themeSelector');
+
+        let gameInterval = null; // Variable to hold the interval
+        let speed = 100; // Default speed
+        let obstacles = []; // Array to hold obstacles
+        let points = 0; // Player's points
+        let multiplier = 1; // Multiplier value
+        let isPaused = false; // Pause state
+        
+        const snakeGameSize = { width: snakeGameElement.clientWidth, height: snakeGameElement.clientHeight };
+        
+        let snake = [{ x: Math.floor(snakeGameSize.width / 2), y: Math.floor(snakeGameSize.height / 2), emoji:"🐍" }];
+        let apple = { x:getRandomPosition(10), y:getRandomPosition(10) }; // Initial apple position
+        let direction = { x: 10, y: 0 }; // Start moving right
+        let score = 0;
+
+       // Snake skins and their costs
+       const skins = [
+           { emoji:"🐍", cost :10 },
+           { emoji:"🟩", cost :50 },
+           { emoji:"🐉", cost :100 },
+           { emoji:"🐢", cost :200 },
+           { emoji:"🦎", cost :500 },
+           { emoji:"🦖", cost :1000 },
+           { emoji:"🐊", cost :2000 },
+           { emoji:"🦕", cost :5000 },
+           { emoji:"🐉", cost :15000 },
+           { emoji:"🦖", cost :30000 },
+           { emoji:"🦚", cost :50000 },
+           { emoji:"🐲", cost :100000 }, // Additional skins
+           { emoji:"🦋", cost :150000 },
+           { emoji:"🐺", cost :200000 }
+       ];
+
+       function getRandomPosition(unit) {
+           return Math.floor(Math.random() * (snakeGameSize.width / unit)) * unit;
+       }
+
+       function drawGrid() {
+           // Draw vertical lines
+           for (let x = 0; x <= snakeGameSize.width; x += 10) {
+               const line = document.createElement('div');
+               line.classList.add('grid-line');
+               line.style.width = '2px'; // Thicker lines
+               line.style.height = `${snakeGameSize.height}px`;
+               line.style.left = `${x}px`;
+               snakeGameElement.appendChild(line);
+           }
+
+           // Draw horizontal lines
+           for (let y = 0; y <= snakeGameSize.height; y += 10) {
+               const line = document.createElement('div');
+               line.classList.add('grid-line');
+               line.style.width = `${snakeGameSize.width}px`;
+               line.style.height = '2px'; // Thicker lines
+               line.style.top = `${y}px`;
+               snakeGameElement.appendChild(line);
+           }
+       }
+
+       function drawSnake() {
+           snake.forEach((segment) => {
+               const segmentElement = document.createElement('div');
+               segmentElement.classList.add('snake-segment');
+               segmentElement.style.left = `${segment.x}px`;
+               segmentElement.style.top = `${segment.y}px`;
+               segmentElement.innerText = segment.emoji || "🐍"; // Use the selected skin or default head skin
+               snakeGameElement.appendChild(segmentElement);
+           });
+       }
+
+       function drawApple() {
+           const appleElement = document.createElement('div');
+           appleElement.classList.add('apple');
+           appleElement.style.left = `${apple.x}px`;
+           appleElement.style.top = `${apple.y}px`;
+           appleElement.innerText = "🍎"; // Apple emoji
+           snakeGameElement.appendChild(appleElement);
+       }
+
+       function drawObstacles() {
+           obstacles.forEach(obstacle => {
+               const obstacleElement = document.createElement('div');
+               obstacleElement.classList.add('obstacle');
+               obstacleElement.style.left = `${obstacle.x}px`;
+               obstacleElement.style.top = `${obstacle.y}px`;
+               snakeGameElement.appendChild(obstacleElement);
+           });
+       }
+
+       function moveSnake() {
+           if (isPaused) return;
+
+           const headX = snake[0].x + direction.x;
+           const headY = snake[0].y + direction.y;
+
+           // Check for collision with walls
+           if (headX >= snakeGameSize.width || headY >= snakeGameSize.height || headX < 0 || headY < 0) {
+               endGame();
+               return;
+           }
+
+           // Check for collision with itself
+           if (snake.some(segment => segment.x === headX && segment.y === headY)) {
+               endGame();
+               return;
+           }
+
+           // Check for collision with obstacles
+           if (obstacles.some(obstacle => obstacle.x === headX && obstacle.y === headY)) {
+               endGame();
+               return;
+           }
+
+           // Add new head
+           const newHead = { x: headX, y: headY, emoji:snake[0].emoji }; // Keep the new head's skin consistent with the current skin
+
+           snake.unshift(newHead);
+
+           // Check if apple is eaten (with larger hitbox)
+           if (
+              (newHead.x <= apple.x + 30 && newHead.x >= apple.x -30) &&
+              (newHead.y <= apple.y +30 && newHead.y >= apple.y -30)
+             ) {
+              score++;
+              points += (5 * multiplier); // Increase points based on multiplier
+              scoreDisplay.innerText ="Score:" + score;
+
+              if (points >= multiplier * 100) { 
+                  multiplier++; // Increase multiplier every time points reach a multiple of current multiplier *100
+                  multiplierDisplay.innerText ="Multiplier x" + multiplier ; 
+              }
+              
+              pointsDisplay.innerText ="Points:" + points;
+
+              placeApple();
+              updateShop(); // Update shop after eating an apple
+
+              // Grow the snake based on the current multiplier
+              for (let i = 0; i < multiplier; i++) {
+                  snake.push({}); // Add empty segments to grow the snake
+              }
+              
+          } else {
+              snake.pop(); // Remove last segment unless eating an apple
+          }
+
+          render();
+      }
+
+      function render() {
+          snakeGameElement.innerHTML = ''; // Clear previous frame
+          drawGrid(); // Draw grid lines
+          drawSnake();
+          drawApple();
+          drawObstacles(); // Draw obstacles
+      }
+
+      function placeApple() {
+         do {
+             apple.x = getRandomPosition(10);
+             apple.y = getRandomPosition(10);
+         } while (
+             snake.some(segment => segment.x === apple.x && segment.y === apple.y) ||
+             obstacles.some(obstacle => obstacle.x === apple.x && obstacle.y === apple.y)
+         );
+     }
+
+     function resetSnake() {
+         clearInterval(gameInterval); // Clear existing interval
+         speed = 100; // Reset speed to default
+         obstacles.length=0 ; // Clear obstacles
+
+         snake.length=1 ; 
+         direction.x= -10 ; direction.y=0 ; score=0 ; 
+         scoreDisplay.innerText ="Score:" + score;
+
+         placeApple();
+         
+         gameInterval = setInterval(moveSnake, speed); // Start moving the snake again
+     }
+     
+     function endGame() {
+         clearInterval(gameInterval); // Stop the game loop
+         scoreDisplay.innerText += " - Game Over!";
+     }
+     
+     window.addEventListener('keydown', event => {
+         switch(event.key) {
+             case 'ArrowUp':
+                 if(direction.y === 0) direction = { x :0 , y :-10 }; // Prevent going back directly
+                 break ;
+             case 'ArrowDown':
+                 if(direction.y === 0) direction= { x :0 , y :10 };
+                 break ;
+             case 'ArrowLeft':
+                 if(direction.x === 0) direction= { x :-10 , y :0 };
+                 break ;
+             case 'ArrowRight':
+                 if(direction.x === 0) direction= { x :10 , y :0 };
+                 break ;
+         }
+      });
+
+      restartButton.addEventListener('click', resetSnake);
+
+      pauseButton.addEventListener('click', () => {
+         if (isPaused) {
+             gameInterval = setInterval(moveSnake, speed); // Resume game loop
+             pauseButton.innerText ="Pause Game";
+         } else {
+             clearInterval(gameInterval); // Stop game loop
+             pauseButton.innerText ="Resume Game";
+         }
+         isPaused = !isPaused; 
+     });
+
+     function updateShop() {
+         const shopDiv = document.getElementById("skins");
+         shopDiv.innerHTML = ""; // Clear previous skins
+
+         skins.forEach(skin => {
+             const skinDiv = document.createElement("div");
+             skinDiv.classList.add("skin");
+             skinDiv.innerHTML =
+                `${skin.emoji} - Cost ${skin.cost} points ` +
+                `<button class="buy-button" onclick="buySkin(${skin.cost}, '${skin.emoji}')">Buy</button>`;
+             shopDiv.appendChild(skinDiv);
+         });
+     }
+
+     function buySkin(cost, emoji) {
+         if (points >= cost) {
+             points -= cost; // Deduct cost from points
+             pointsDisplay.innerText ="Points:" + points;
+
+             // Change all segments of the snake to the new skin.
+             if (snake.length > 0) {
+                 for(let i=0;i<snake.length;i++){
+                     snake[i].emoji=emoji ; 
+                 }
+                 render(); // Re-render the game to show new skin on all segments.
+             }
+         } else {
+             alert("Not enough points!");
+         }
+     }
+
+     function changeTheme(theme) {
+         switch(theme) {
+             case 'white':
+                 document.body.style.backgroundColor = '#f4f4f4';
+                 break;
+             case 'black':
+                 document.body.style.backgroundColor = '#333';
+                 break;
+             case 'darkcyan':
+                 document.body.style.backgroundColor = '#008B8B';
+                 break;
+         }
+         closeThemeSelector(); 
+     }
+
+     function closeThemeSelector() {
+         themeSelector.style.display='none'; 
+     }
+
+
+     themeButton.addEventListener('click', () => { 
+         themeSelector.style.display='block'; 
+     });
+
+     updateShop(); // Initialize shop on load
+
+     placeApple();
+     gameInterval = setInterval(moveSnake, speed); // Start moving the snake
+
+    </script>
+</body>
+</html>
